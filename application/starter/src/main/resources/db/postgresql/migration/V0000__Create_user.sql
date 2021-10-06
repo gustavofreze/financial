@@ -1,0 +1,18 @@
+CREATE ROLE app;
+
+GRANT CONNECT ON DATABASE financial_adm TO app;
+
+GRANT USAGE ON SCHEMA account TO app;
+GRANT USAGE ON SCHEMA bookkeeping TO app;
+
+GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA account TO app;
+GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA bookkeeping TO app;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA account GRANT SELECT, INSERT, UPDATE ON TABLES TO app;
+ALTER DEFAULT PRIVILEGES IN SCHEMA bookkeeping GRANT SELECT, INSERT, UPDATE ON TABLES TO app;
+
+CREATE USER financial_app WITH PASSWORD 'fC8&wsPuF7qZ';
+COMMENT ON ROLE financial_app IS 'Usuário utilizado pela aplicação Financial.';
+
+GRANT app TO financial_app;
+COMMENT ON ROLE app IS 'Permissões padrões para aplicações.';

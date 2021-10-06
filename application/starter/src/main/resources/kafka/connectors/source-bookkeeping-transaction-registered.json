@@ -1,0 +1,40 @@
+{
+  "name": "source-bookkeeping-transaction-registered",
+  "config": {
+    "tasks.max": 1,
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "skipped.operations": "u,d",
+    "message.key.columns": "bookkeeping.transactions:code",
+    "include.schema.changes": false,
+    "publication.autocreate.mode": "all_tables",
+
+    "snapshot.mode": "initial",
+    "snapshot.locking.mode": "none",
+
+    "database.port": 5432,
+    "database.user": "postgres",
+    "database.dbname": "financial_adm",
+    "database.password": "postgres",
+    "database.hostname": "postgresql",
+    "database.server.name": "financial-server",
+    "database.history.kafka.topic": "schema-changes.bookkeeping",
+    "database.history.kafka.bootstrap.servers": "broker:9000",
+
+    "table.include.list": "bookkeeping.transactions",
+
+    "transforms": "unwrap, Reroute, SetSchemaMetadata",
+    "transforms.unwrap.type": "io.debezium.transforms.ExtractNewRecordState",
+    "transforms.unwrap.drop.tombstones": true,
+    "transforms.Reroute.type": "io.debezium.transforms.ByLogicalTableRouter",
+    "transforms.Reroute.topic.regex": "(.*)transactions(.*)",
+    "transforms.Reroute.topic.replacement": "financial.accounting.bookkeeping.transaction-registered",
+    "transforms.SetSchemaMetadata.type": "org.apache.kafka.connect.transforms.SetSchemaMetadata$Value",
+    "transforms.SetSchemaMetadata.schema.name": "TransactionRegistered",
+    "transforms.SetSchemaMetadata.schema.version": 1,
+
+    "key.converter": "io.confluent.connect.avro.AvroConverter",
+    "value.converter": "io.confluent.connect.avro.AvroConverter",
+    "key.converter.schema.registry.url": "http://schema-registry:8081",
+    "value.converter.schema.registry.url": "http://schema-registry:8081"
+  }
+}

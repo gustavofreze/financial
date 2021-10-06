@@ -1,0 +1,150 @@
+version: "3.8"
+
+services:
+  app:
+    build:
+      context: ../financial
+      dockerfile: ./Dockerfile
+    hostname: app
+    container_name: app
+    ports:
+      - "8080:8080"
+    env_file:
+      - ./config/configs.env
+    depends_on:
+      - broker
+      - postgresql
+      - schema-registry
+    volumes:
+      - ./gradle:/opt/data/gradle
+      - ./gradlew:/opt/data/gradlew
+      - ./application:/opt/data/application
+      - ./entrypoint.sh:/opt/data/entrypoint.sh
+      - ./build.gradle.kts:/opt/data/build.gradle.kts
+      - ./gradle.properties:/opt/data/gradle.properties
+      - ./settings.gradle.kts:/opt/data/settings.gradle.kts
+      - ./application/starter/build/libs/starter-all.jar:/opt/data/starter-all.jar
+      - ./application/starter/src/main/resources/kafka/connectors:/opt/data/kafka/connectors
+      - ./application/account/src/main/resources/command/show-balance.sh:/opt/data/show-balance.sh
+      - ./application/account/src/main/resources/command/solve-failures.sh:/opt/data/solve-failures.sh
+      - ./application/bookkeeping/src/main/resources/command/register-financial-transaction.sh:/opt/data/register-financial-transaction.sh
+
+  postgresql:
+    image: debezium/postgres:13-alpine
+    container_name: postgresql
+    restart: always
+    hostname: postgresql
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "postgres"
+    volumes:
+      - ./application/starter/src/main/resources/db/postgresql/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:6.2.0
+    restart: always
+    hostname: zookeeper
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_SERVER_ID: 1
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_CLIENT_PORT: 2181
+
+  broker:
+    image: confluentinc/cp-kafka:6.2.0
+    hostname: broker
+    container_name: broker
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      KAFKA_JMX_PORT: 9021
+      KAFKA_BROKER_ID: 1
+      KAFKA_BROKER_RACK: 1
+      KAFKA_JMX_HOSTNAME: "localhost"
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
+      CONFLUENT_METRICS_ENABLE: "true"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://broker:9000,PLAINTEXT_HOST://localhost:9001"
+      CONFLUENT_SUPPORT_CUSTOMER_ID: "anonymous"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_CONFLUENT_SCHEMA_REGISTRY_URL: "http://schema-registry:8081"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT"
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
+      CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: "broker:9000"
+    depends_on:
+      - zookeeper
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:6.2.0
+    hostname: schema-registry
+    container_name: schema-registry
+    ports:
+      - "8081:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: "schema-registry"
+      SCHEMA_REGISTRY_LISTENERS: "http://0.0.0.0:8081"
+      SCHEMA_REGISTRY_AVRO_COMPATIBILITY_LEVEL: "forward_transitive"
+      SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL: "zookeeper:2181"
+    depends_on:
+      - broker
+      - zookeeper
+
+  kafka-connect:
+    image: debezium/connect:1.7
+    restart: always
+    hostname: kafka-connect
+    container_name: kafka-connect
+    ports:
+      - "8083:8083"
+    environment:
+      GROUP_ID: 1
+      HEAP_OPTS: "-Xmx256m"
+      KEY_CONVERTER: "io.confluent.connect.avro.AvroConverter"
+      VALUE_CONVERTER: "io.confluent.connect.avro.AvroConverter"
+      BOOTSTRAP_SERVERS: "broker:9000"
+      SCHEMA_REGISTRY_URL: "http://schema-registry:8081"
+      CONFIG_STORAGE_TOPIC: "kafka.connect.config"
+      OFFSET_STORAGE_TOPIC: "kafka.connect.offsets"
+      STATUS_STORAGE_TOPIC: "kafka.connect.status"
+      INTERNAL_KEY_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      INTERNAL_VALUE_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      KEY_CONVERTER_SCHEMA_REGISTRY_URL: "http://schema-registry:8081"
+      VALUE_CONVERTER_SCHEMA_REGISTRY_URL: "http://schema-registry:8081"
+    depends_on:
+      - broker
+      - schema-registry
+
+  control-center:
+    image: confluentinc/cp-enterprise-control-center:6.2.0
+    container_name: control-center
+    ports:
+      - "9021:9021"
+    environment:
+      PORT: 9021
+      CONTROL_CENTER_CONNECT_CLUSTER: "kafka-connect:8083"
+      CONTROL_CENTER_BOOTSTRAP_SERVERS: "broker:9000"
+      CONTROL_CENTER_REPLICATION_FACTOR: 1
+      CONTROL_CENTER_SCHEMA_REGISTRY_URL: "http://schema-registry:8081"
+      CONTROL_CENTER_LOG4J_ROOT_LOGLEVEL: "ERROR"
+      CONTROL_CENTER_TOOLS_LOG4J_LOGLEVEL: "ERROR"
+      CONFLUENT_METRICS_TOPIC_REPLICATION: 1
+      CONTROL_CENTER_CONNECT_FINANCIAL_CLUSTER: "kafka-connect:8083"
+      CONTROL_CENTER_INTERNAL_TOPICS_PARTITIONS: 1
+      CONTROL_CENTER_MONITORING_INTERCEPTOR_TOPIC_PARTITIONS: 1
+      CONTROL_CENTER_MONITORING_INTERCEPTOR_BOOTSTRAP_SERVERS: "broker:9000"
+    depends_on:
+      - broker
+      - zookeeper
+      - kafka-connect
+      - schema-registry
+    links:
+      - broker
+      - zookeeper
+      - kafka-connect
+      - schema-registry

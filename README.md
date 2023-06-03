@@ -1,6 +1,6 @@
 # Financial
 
-[![Minimum Kotlin Version](https://img.shields.io/badge/kotlin-1.5.21-blue)](https://kotlinlang.org)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 * [Overview](#overview)
     - [Domínio](#domain)
@@ -171,7 +171,7 @@ resulta em um comando `AdjustBalance`, que faz a atualização dos saldos das co
 Para clonar o repositório usando a linha de comando, execute:
 
 ```bash
-> git clone https://github.com/gustavofreze/financial.git
+git clone https://github.com/gustavofreze/financial.git
 ```
 
 <div id='settings'></div> 
@@ -184,7 +184,7 @@ e **9021**. Se alguma das portas descritas estiver em uso, ela deve ser “liber
 Para instalar e configurar o projeto, execute na raiz do projeto:
 
 ```bash
-> make configure
+make configure
 ```
 
 <div id='roadmap'></div> 
@@ -200,7 +200,7 @@ Para executar os casos de uso, basta estar com o ambiente docker inicializado.
 Você pode conferir executando:
 
 ```bash
-> docker ps --format "table {{.Names}}\t{{.Status}}"
+docker ps --format "table {{.Names}}\t{{.Status}}"
 ```
 
 <!--suppress HtmlDeprecatedAttribute -->
@@ -213,7 +213,7 @@ Você pode conferir executando:
 E posteriormente verifique a aplicação executando:
 
 ```bash
-> docker logs -f app
+docker logs -f app
 ```
 
 <!--suppress HtmlDeprecatedAttribute -->
@@ -232,7 +232,7 @@ O primeiro comando a ser executado, pertence ao contexto de account. O comando `
 contas.
 
 ```bash
-> make show-balance
+make show-balance
 ```
 
 <!--suppress HtmlDeprecatedAttribute -->
@@ -246,7 +246,7 @@ O segundo comando a ser executado, pertence ao contexto de bookkeeping. O comand
 registra uma transação financeira.
 
 ```bash
-> make register-financial-transaction
+make register-financial-transaction
 ```
 
 <!--suppress HtmlDeprecatedAttribute -->
@@ -266,7 +266,7 @@ conta estiver com saldo de **R$ 0,00** ou **negativo**, a operação é realizad
 Para conferir se o saldo foi atualizado, basta executar novamente o comando `ShowBalance`.
 
 ```bash
-> make show-balance
+make show-balance
 ```
 
 <!--suppress HtmlDeprecatedAttribute -->
@@ -287,7 +287,7 @@ Para demonstrar na prática, existe um registro previamente registrado na fila t
 novamente a partir da fila de troubleshooting, é necessário executar o comando `SolveFailures`.
 
 ```bash
-> make solve-failures
+make solve-failures
 ```
 
 <!--suppress HtmlDeprecatedAttribute -->
@@ -302,7 +302,7 @@ Com a política de atualizar saldo executada, o saldo das contas foi mais uma ve
 Para conferir se o saldo foi atualizado, basta executar novamente o comando `ShowBalance`.
 
 ```bash
-> make show-balance
+make show-balance
 ```
 
 <!--suppress HtmlDeprecatedAttribute -->
@@ -319,19 +319,19 @@ Para conferir se o saldo foi atualizado, basta executar novamente o comando `Sho
 - Executa todos os testes:
 
   ```bash
-  > make test
+  make test
   ```
 
 - Executa os testes unitários:
 
   ```bash
-  > make unit-test
+  make unit-test
   ```
 
 - Executa os testes de integração:
 
   ```bash
-  > make integration-test
+  make integration-test
   ```
 
 <div id="useful"></div> 
@@ -341,17 +341,17 @@ Para conferir se o saldo foi atualizado, basta executar novamente o comando `Sho
 - Para todos os containers do projeto:
 
   ```bash
-  > make stop
+  make stop
   ```
 
 - Remove todos os containers e networks criados pelo projeto:
 
   ```bash
-  > make clean
+  make clean
   ```
 
 - Remove todos os containers, networks e imagens criados pelo projeto:
 
   ```bash
-  > make clean-all
+  make clean-all
   ```

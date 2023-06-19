@@ -1,6 +1,6 @@
-FROM gustavofreze/gradle:7.1.1
+FROM gradle:7.1.1-jdk16
 
-ARG FLYWAY_VERSION=7.14.0
+ARG FLYWAY_VERSION=9.19.4
 
 WORKDIR /opt/data
 

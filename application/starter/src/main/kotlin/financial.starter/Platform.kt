@@ -1,6 +1,6 @@
 package financial.starter
 
-import financial.shared.Environment
+import financial.shared.Environment.get
 import financial.shared.streams.ConnectorFactory
 import financial.shared.streams.StreamFactory
 import financial.shared.streams.TopicFactory
@@ -18,7 +18,7 @@ class Platform(
     }
 
     private fun topics(): List<Topic> {
-        val topics = Environment.get("TOPICS")
+        val topics = get("TOPICS")
         return topics.split(",").map { Topic(it.trim().lowercase()) }
     }
 }

@@ -1,14 +1,18 @@
 #!/bin/bash
+set -euo pipefail
 
-psql <<EOF
-\connect postgres;
-EOF
+DB_NAME="financial_adm"
+PSQL="psql -v ON_ERROR_STOP=1 -d postgres -U postgres -tAc"
 
-CREATE="CREATE DATABASE financial_adm;"
-SELECT="SELECT 1 FROM pg_database WHERE datname = 'financial_adm';"
+printf "\n\nRunning DDL commands for the database %s ... \n" "$DB_NAME"
 
-printf "\n\nRunning DDL commands for the database financial_adm ... \n"
+exists=$($PSQL "SELECT 1 FROM pg_database WHERE datname = '${DB_NAME}'" | tr -d '[:space:]' || true)
 
-psql -U postgres -tc "${SELECT}" | grep -q 1 || psql -U postgres -c "${CREATE}"
+if [ "$exists" != "1" ]; then
+  echo "Database ${DB_NAME} not found. Creating..."
+  $PSQL "CREATE DATABASE \"${DB_NAME}\";"
+else
+  echo "Database ${DB_NAME} already exists. Skipping creation."
+fi
 
 printf "\n\nEnd of execution. \n"

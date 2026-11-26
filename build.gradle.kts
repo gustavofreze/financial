@@ -50,6 +50,7 @@ subprojects {
     tasks.register<Test>("allTests") {
         outputs.upToDateWhen { false }
         useJUnitPlatform { }
+        filter { isFailOnNoMatchingTests = false }
     }
 
     tasks.register<Test>("unitTest") {

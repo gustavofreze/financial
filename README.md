@@ -1,113 +1,80 @@
 # Financial
 
-[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-
 * [Overview](#overview)
-    - [Domínio](#domain)
-    - [Arquitetura](#architecture)
-    - [Organização da aplicação](#organization)
-    - [Casos de uso](#use_cases)
-* [Instalação](#installation)
-    - [Repositório](#repository)
-    - [Configuração](#settings)
-* [Roadmap](#roadmap)
-    - [Verificando o ambiente](#checking)
-    - [Executando os casos de uso](#run_use_cases)
-* [Testes](#tests)
-* [Úteis](#useful)
-
-<div id="overview"></div> 
+    - [Domain](#domain)
+    - [Architecture](#architecture)
+    - [Modules](#modules)
+    - [Flow](#flow)
+    - [Use cases](#use-cases)
+    - [Queries](#queries)
+* [Installation](#installation)
+    - [Repository](#repository)
+    - [Configuration](#configuration)
+    - [Usage](#usage)
+    - [Tests](#tests)
+* [Environment setup](#environment-setup)
+    - [Ports](#ports)
+    - [Environment variables](#environment-variables)
+* [License](#license)
 
 ## Overview
 
-A ideia deste projeto é aplicar o conteúdo estudado sobre **Clean Architecture**, **Hexagonal Architecture**,
-**Domain-Driven Design**, **Event Sourcing**, **CQRS** e **Kafka**.
+Study project that applies Clean Architecture, Hexagonal Architecture, Domain-Driven Design, Event Sourcing, CQRS, and
+Kafka to an accounting domain. A financial transaction registered in bookkeeping is stored as an event, published to
+Kafka through change data capture, and consumed by account, which moves the amount from the debit account to the
+credit account.
 
-<div id='domain'></div> 
+The application has no HTTP interface. Every use case runs as a console command inside the `app` container through a
+`make` target, and the long-running `platform` process creates the topics, registers the Kafka Connect connector, and
+runs the stream that feeds the account policies.
 
-### Domínio
+### Domain
 
-O domínio da aplicação é **financial**, que possui um subdomínio **accounting**. Dentro do subdomínio, temos dois
-contextos, **account** e **bookkeeping**.
+The domain is **financial**, with the subdomain **accounting**: the process of recording the financial transactions of
+a company. Accounting is split in two bounded contexts, each with one aggregate, as Figure 1 shows.
 
-<!--suppress HtmlDeprecatedAttribute -->
 <p align="center">
-    <img src="doc/images/overview/financial-domain.png" alt="Representação do domínio."/>
-    <br />
-    <tl>Representação do domínio.</tl>
+  <img src="docs/diagrams/financial-domain.svg" alt="Financial domain">
+  <br>
+  <sub>Figure 1. The financial domain, its accounting subdomain, and its two bounded contexts.</sub>
 </p>
 
-#### Accounting
+**Bookkeeping** records the financial transactions: purchases, sales, receipts, and payments of a person or an
+organization. The `Transaction` aggregate is event sourced. Its state is never stored as a row, only the events it
+raised, appended to the `bookkeeping.transactions` event store with their sequence, revision, and aggregate identity.
+Registering a transaction raises `TransactionRegistered`.
 
-O **Accounting** (contabilidade) é o processo de registro de transações financeiras pertencentes a uma empresa.
+**Account** keeps the ledger accounts, in which the debits and credits of the transactions are classified and
+summarized. The `AccountBalance` aggregate holds the balance of one account, and debiting or crediting it returns a new
+balance. Account never calls bookkeeping. It learns about each transaction only from the `TransactionRegistered` event.
 
-**Account**
+### Architecture
 
-O contexto de account nada mais é do que uma conta contábil, que contém contas nas quais as informações sobre as
-transações de débitos e créditos são classificadas e resumidas.
+Each context follows the hexagonal architecture of Figure 2. The core knows nothing of the console, Kafka, or
+PostgreSQL. It exposes ports: the console adapter drives it through the command bus, the Kafka stream adapter through
+the event bus, which hands each event to its policies, and the driven adapters implement its output ports.
 
-**Bookkeeping**
-
-O contexto de bookkeeping é o registro das transações financeiras, e envolve a preparação de documentos de origem para
-todas as transações, operações e outros eventos de uma empresa. As transações incluem compras, vendas, recebimentos e
-pagamentos por uma pessoa individual ou uma organização.
-
-
-<div id='architecture'></div> 
-
-### Arquitetura
-
-A arquitetura da aplicação está dividida em alguns pilares, os quais delimitam os contextos.
-
-<!--suppress HtmlDeprecatedAttribute -->
 <p align="center">
-    <img src="doc/images/overview/financial-architecture.png" alt="Arquitetura do Financial."/>
-    <br />
-    <tl>Arquitetura do Financial.</tl>
+  <img src="docs/diagrams/financial-architecture.svg" alt="Financial architecture">
+  <br>
+  <sub>Figure 2. Hexagonal architecture: driver adapters, ports, application and domain layers, driven adapters.</sub>
 </p>
 
+The code of each context is organized in the same five layers:
 
-<!--suppress HtmlDeprecatedAttribute -->
-<p align="center">
-    <img src="doc/images/overview/financial-architecture-flow.png" alt="Fluxo da aplicação."/>
-    <br />
-    <tl>Fluxo da aplicação.</tl>
-</p>
+| Layer     | Responsibility                                                                                                     |
+|:----------|:-------------------------------------------------------------------------------------------------------------------|
+| `command` | Orders to run a business use case, and their handlers. A command usually results in events being emitted.          |
+| `core`    | The domain model and its rules, independent of every other layer and of whatever triggers it.                      |
+| `driven`  | Secondary adapters implementing the output ports of the core: repositories, the troubleshooting queue, the viewer. |
+| `driver`  | Primary adapters translating a delivery mechanism into a core call: the console driver and the Kafka event mapper. |
+| `query`   | Read models and how they are retrieved, apart from the write side, as CQRS prescribes.                             |
 
-- **Command**
+A policy is a driver that reacts to an event with a command. A policy that fails does not stop the stream: the event,
+the policy, and the error go to the `account.troubleshoot` table, a troubleshooting queue in the manner of a
+[dead letter queue](https://en.wikipedia.org/wiki/Dead_letter_queue), from which the policy can run again.
 
-  Um comando é uma ordem para execução de algum caso de uso de negócio, eles geralmente resultam em eventos sendo
-  emitidos.
-
-
-- **Core**
-
-  É o núcleo da aplicação. Os objetos desta camada contém a lógica para manipular os casos de uso, que são específicos
-  do próprio domínio. O core é independente dos processos de negócio que acionam essa lógica, são independentes e
-  desconhecem completamente outras camadas.
-
-
-- **Driven**
-
-  No driven estão os adaptadores de acionamento, os quais implementam as interfaces de saída da aplicação. Isso permite
-  que o núcleo da aplicação exponha funcionalidades para o exterior.
-
-
-- **Driver**
-
-  No driver estão os adaptadores primários que envolvem uma porta e a usam para informar ao core o que fazer. Eles
-  traduzem tudo o que vem de um mecanismo de entrega em uma chamada de método no core.
-
-
-- **Query**
-
-  Implementações das recuperações dos modelos de leitura.
-
-<div id="organization"></div> 
-
-### Organização da aplicação
-
-De forma geral, a aplicação está separada em quatro módulos:
+### Modules
 
 ```
 application
@@ -117,241 +84,157 @@ application
 ┗ 📂starter
 ```
 
-**Account**: Possui a lógica/regra de negócio do contexto de account.
+| Module        | Content                                                                                                                                            |
+|:--------------|:---------------------------------------------------------------------------------------------------------------------------------------------------|
+| `account`     | The account context.                                                                                                                               |
+| `bookkeeping` | The bookkeeping context.                                                                                                                           |
+| `shared`      | Building blocks, event sourcing, buses, and the database and Kafka infrastructure, with no business rule. Its content can be split into libraries. |
+| `starter`     | Entry point, dependency wiring, database migrations, and the Kafka Connect connector definition.                                                   |
 
-**Bookkeeping**: Possui a lógica/regra de negócio do contexto de bookkeeping.
+### Flow
 
-**Shared**: Possui implementações e interfaces comuns, que não detém lógica/regra de negócio. O conteúdo desse módulo
-pode ser convertido em várias bibliotecas.
+The streaming uses [change data capture](https://en.wikipedia.org/wiki/Change_data_capture) over the database log, so
+the command writes only to its own event store and nothing in the application publishes to Kafka. A Debezium connector
+reads the PostgreSQL write-ahead log, keeps only the inserts of `bookkeeping.transactions`, and republishes each one as
+an Avro record on the `financial.accounting.bookkeeping.transaction-registered` topic, with its schema in the Schema
+Registry. The `AdjustBalancePolicy` of account consumes the topic and dispatches `AdjustBalance`.
 
-**Starter**: Possui a inicialização dos componentes de plataforma usados pela aplicação, e as configurações de
-dependências da aplicação.
-
-<div id='use_cases'></div> 
-
-### Casos de uso
-
-**Bookkeeping**
-
-No contexto de bookkeeping, quando uma operação contábil é registrada a partir de um comando
-`RegisterFinancialTransaction`, então um evento de `TransactionRegistered` ocorre, e é registrado no
-tópico `financial.accounting.bookkeeping.transaction-registered`. Apenas transações com valores maiores que **R$ 0,00**
-são registradas.
-
-O streaming dos dados é realizado usando o Kafka, onde foi utilizado o método
-de [CDC](https://en.wikipedia.org/wiki/Change_data_capture), implementando uma abordagem utilizando logs.
-
-<!--suppress HtmlDeprecatedAttribute -->
 <p align="center">
-    <img src="doc/images/overview/financial-kafka-cdc.png" alt="Fluxo de CDC com o Kafka."/>
-    <br />
-    <tl>Fluxo de CDC com o Kafka.</tl>
+  <img src="docs/diagrams/financial-flow.svg" alt="Financial communication">
+  <br>
+  <sub>Figure 3. Communication of the Financial application, one transaction step by step.</sub>
 </p>
 
-**Account**
-
-No contexto de account, uma política reage ao evento `TransactionRegistered` emitido pelo contexto de bookkeeping, o que
-resulta em um comando `AdjustBalance`, que faz a atualização dos saldos das contas.
-
-<!--suppress HtmlDeprecatedAttribute -->
 <p align="center">
-    <img src="doc/images/overview/financial-kafka-flow-macro.png" alt="Fluxo de produção e consumo do evento."/>
-    <br />
-    <tl>Fluxo de produção e consumo do evento.</tl>
+  <img src="docs/diagrams/financial-events.svg" alt="Financial domain events">
+  <br>
+  <sub>Figure 4. EventStorming view: the command that raises the domain event and the policy that reacts to it.</sub>
 </p>
 
-<div id='installation'></div> 
+Sources: [financial-domain.html](docs/diagrams/financial-domain.html),
+[financial-architecture.html](docs/diagrams/financial-architecture.html),
+[financial-flow.html](docs/diagrams/financial-flow.html),
+[financial-events.html](docs/diagrams/financial-events.html).
 
-## Instalação
+### Use cases
 
-<div id='repository'></div> 
+- [Financial transaction registering](docs/USE_CASES.md#financial-transaction-registering)
+- [Balance adjusting](docs/USE_CASES.md#balance-adjusting)
+- [Failures solving](docs/USE_CASES.md#failures-solving)
 
-### Repositório
+### Queries
 
-Para clonar o repositório usando a linha de comando, execute:
+- [Show balances](docs/QUERIES.md#show-balances)
+
+## Installation
+
+### Repository
+
+To clone the repository using the command line, run:
 
 ```bash
 git clone https://github.com/gustavofreze/financial.git
 ```
 
-<div id='settings'></div> 
+### Configuration
 
-### Configuração
-
-Verifique se algum processo usa as portas: **2181**, **5432**, **8080**, **8081**, **8083**, **9000**, **9001**
-e **9021**. Se alguma das portas descritas estiver em uso, ela deve ser “liberada”.
-
-Para instalar e configurar o projeto, execute na raiz do projeto:
+To install project dependencies and build the application jar, run:
 
 ```bash
 make configure
 ```
 
-<div id='roadmap'></div> 
-
-## Roadmap
-
-<div id='checking'></div> 
-
-### Verificando o ambiente
-
-Para executar os casos de uso, basta estar com o ambiente docker inicializado.
-
-Você pode conferir executando:
+To start the application containers, run:
 
 ```bash
-docker ps --format "table {{.Names}}\t{{.Status}}"
+make start
 ```
 
-<!--suppress HtmlDeprecatedAttribute -->
-<p align="center">
-    <img src="doc/images/roadmap/containers-status.png" alt="Containers inicializados."/>
-    <br />
-    <tl>Containers inicializados.</tl>
-</p>
-
-E posteriormente verifique a aplicação executando:
+To stop the application containers and remove their network, run:
 
 ```bash
-docker logs -f app
+make stop
 ```
 
-<!--suppress HtmlDeprecatedAttribute -->
-<p align="center">
-    <img src="doc/images/roadmap/app-status.png" alt="Aplicação pronta para executar os casos de uso."/>
-    <br />
-    <tl>Aplicação pronta para executar os casos de uso.</tl>
-</p>
+### Usage
 
-
-<div id='run_use_cases'></div> 
-
-### Executando os casos de uso
-
-O primeiro comando a ser executado, pertence ao contexto de account. O comando `ShowBalance` exibe o saldo de todas as
-contas.
-
-```bash
-make show-balance
-```
-
-<!--suppress HtmlDeprecatedAttribute -->
-<p align="center">
-    <img src="doc/images/roadmap/opening-balance.png" alt="Saldo inicial das contas."/>
-    <br />
-    <tl>Saldo inicial das contas.</tl>
-</p>
-
-O segundo comando a ser executado, pertence ao contexto de bookkeeping. O comando `RegisterFinancialTransaction`
-registra uma transação financeira.
+To register a financial transaction, run:
 
 ```bash
 make register-financial-transaction
 ```
 
-<!--suppress HtmlDeprecatedAttribute -->
-<p align="center">
-    <img src="doc/images/roadmap/register-financial-transaction.png" alt="Transação financeira registrada."/>
-    <br />
-    <tl>Transação financeira registrada.</tl>
-</p>
-
-Após o comando `RegisterFinancialTransaction` ter sido executado, um evento `TransactionRegistered` é gerado, e enviado
-para o tópico no Kafka, através do processo de CDC, conforme explicado anteriormente.
-
-No contexto de account, a política irá reagir ao evento `TransactionRegistered`, o que resulta na execução do
-comando `AdjustBalance`. O saldo é atualizado realizando uma operação de débito e crédito respectivamente. Mesmo se uma
-conta estiver com saldo de **R$ 0,00** ou **negativo**, a operação é realizada.
-
-Para conferir se o saldo foi atualizado, basta executar novamente o comando `ShowBalance`.
+To show the balances, run:
 
 ```bash
 make show-balance
 ```
 
-<!--suppress HtmlDeprecatedAttribute -->
-<p align="center">
-    <img src="doc/images/roadmap/updated-balance.png" alt="Saldo atualizado das contas."/>
-    <br />
-    <tl>Saldo atualizado das contas.</tl>
-</p>
-
-Ainda no contexto de account, caso ocorra uma falha ao executar uma política, o evento desta política vai para uma fila
-de solução de problemas, de forma que é possível tentar novamente sua execução.
-
-Essa fila de solução de problemas, é uma junção dos conceitos
-de [troubleshooting](https://en.wikipedia.org/wiki/Troubleshooting)
-e [DLQ](https://en.wikipedia.org/wiki/Dead_letter_queue).
-
-Para demonstrar na prática, existe um registro previamente registrado na fila troubleshooting. Para executar a política
-novamente a partir da fila de troubleshooting, é necessário executar o comando `SolveFailures`.
+To run again the policies that failed, run:
 
 ```bash
 make solve-failures
 ```
 
-<!--suppress HtmlDeprecatedAttribute -->
-<p align="center">
-    <img src="doc/images/roadmap/solve-failures.png" alt="Execução da fila de troubleshooting."/>
-    <br />
-    <tl>Execução da fila de troubleshooting.</tl>
-</p>
+### Tests
 
-Com a política de atualizar saldo executada, o saldo das contas foi mais uma vez atualizado.
-
-Para conferir se o saldo foi atualizado, basta executar novamente o comando `ShowBalance`.
+Run all tests:
 
 ```bash
-make show-balance
+make tests
 ```
 
-<!--suppress HtmlDeprecatedAttribute -->
-<p align="center">
-    <img src="doc/images/roadmap/updated-balance-by-failure.png" alt="Saldo atualizado das contas, após a execução da política na fila de troubleshooting."/>
-    <br />
-    <tl>Saldo atualizado das contas, após a execução da política na fila de troubleshooting.</tl>
-</p>
+Run a specific test class:
 
-<div id="tests"></div> 
+```bash
+make test-file FILE=AccountBalanceTest
+```
 
-## Testes
+> You can check other available commands by running `make help`.
 
-- Executa todos os testes:
+## Environment setup
 
-  ```bash
-  make test
-  ```
+### Ports
 
-- Executa os testes unitários:
+| Container         | Host port      | Purpose                                     |
+|:------------------|:---------------|:--------------------------------------------|
+| `app`             | `8080`         | Application                                 |
+| `postgresql`      | `5432`         | PostgreSQL with logical decoding (Debezium) |
+| `zookeeper`       | `2181`         | ZooKeeper                                   |
+| `broker`          | `9000`, `9001` | Kafka, internal and host listeners          |
+| `schema-registry` | `8081`         | Confluent Schema Registry                   |
+| `kafka-connect`   | `8083`         | Kafka Connect with the Debezium connector   |
 
-  ```bash
-  make unit-test
-  ```
+### Environment variables
 
-- Executa os testes de integração:
+Every variable the application and its migration run read. This is a study project, so `config/configs.env` is
+committed and the `Development value` column below is the literal content of that file. Every value in it is a
+local-only default and never a real credential. Docker Compose loads the file into the `app` container through
+`env_file`.
 
-  ```bash
-  make integration-test
-  ```
+| Variable                        | Description                                                  | Development value                                                                     |
+|:--------------------------------|:-------------------------------------------------------------|:--------------------------------------------------------------------------------------|
+| `TOPICS`                        | Comma-separated topics the platform creates at startup       | `financial.accounting.bookkeeping.transaction-registered`                             |
+| `APPLICATION_ID`                | Kafka Streams application id                                 | `financial`                                                                           |
+| `BOOTSTRAP_SERVERS`             | Kafka bootstrap servers                                      | `broker:9000`                                                                         |
+| `KAFKA_CONNECT_URL`             | Kafka Connect REST endpoint the connectors are registered at | `http://kafka-connect:8083`                                                           |
+| `SCHEMA_REGISTRY_URL`           | Schema Registry endpoint                                     | `http://schema-registry:8081`                                                         |
+| `KAFKA_CONNECT_CONNECTORS_PATH` | Directory the connector definitions are read from            | `/opt/data/kafka/connectors`                                                          |
+| `POSTGRESQL_DATABASE_USER`      | Least-privilege user the application connects as             | `financial_app`                                                                       |
+| `POSTGRESQL_DATABASE_PASSWORD`  | Password of the application user                             | `fC8&wsPuF7qZ`                                                                        |
+| `POSTGRESQL_DATABASE_JDBC_URL`  | JDBC URL of the application database                         | `jdbc:postgresql://postgresql:5432/financial_adm?stringtype=unspecified`              |
+| `TEST_DATABASE_USER`            | User of the in-memory test database                          | `test`                                                                                |
+| `TEST_DATABASE_PASSWORD`        | Password of the in-memory test database                      | `test`                                                                                |
+| `TEST_DATABASE_JDBC_URL`        | JDBC URL of the in-memory H2 test database                   | `jdbc:h2:mem:financial_adm`                                                           |
+| `FLYWAY_URL`                    | JDBC URL the migration run connects to                       | `jdbc:postgresql://postgresql:5432/financial_adm`                                     |
+| `FLYWAY_USER`                   | Database owner the migration run connects as                 | `postgres`                                                                            |
+| `FLYWAY_TABLE`                  | Table Flyway keeps its schema history in                     | `schema_history`                                                                      |
+| `FLYWAY_SCHEMAS`                | Schemas Flyway manages                                       | `system,account,bookkeeping`                                                          |
+| `FLYWAY_PASSWORD`               | Password of the database owner                               | `postgres`                                                                            |
+| `FLYWAY_LOCATIONS`              | Directory the migration files are read from                  | `filesystem:/opt/data/application/starter/src/main/resources/db/postgresql/migration` |
+| `FLYWAY_DEFAULT_SCHEMA`         | Schema the history table lives in                            | `system`                                                                              |
+| `FLYWAY_CONFIG_FILE_ENCODING`   | Encoding of the migration files                              | `UTF-8`                                                                               |
 
-<div id="useful"></div> 
+## License
 
-## Úteis
-
-- Para todos os containers do projeto:
-
-  ```bash
-  make stop
-  ```
-
-- Remove todos os containers e networks criados pelo projeto:
-
-  ```bash
-  make clean
-  ```
-
-- Remove todos os containers, networks e imagens criados pelo projeto:
-
-  ```bash
-  make clean-all
-  ```
+Financial is licensed under [MIT](LICENSE).

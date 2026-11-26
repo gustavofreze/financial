@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Financial domain</title>
+  <!-- Drawn with the diagram-design skill, Skedli palette (white canvas variant). Export the README SVG from
+       skedli-context with python3 helpers/diagram_export.py <this file>, which runs the skill's export_svg.py
+       and outlines every text as a path, so the image depends on no font. -->
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { --color-ink: #011f51; --color-muted: #3f4a66;
+      --font-sans: 'Nunito', 'Nunito Variable', system-ui, sans-serif;
+      --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    body { font-family: var(--font-sans); background: #ffffff; color: var(--color-ink); min-height: 100vh;
+      display: flex; align-items: center; justify-content: center; padding: 3rem 2rem; }
+    .frame { max-width: 1200px; width: 100%; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+    .eyebrow { font-size: 0.8rem; font-weight: 600; color: var(--color-muted); margin-bottom: 0.25rem; }
+    h1 { font-size: 1.6rem; font-weight: 700; color: var(--color-ink); margin-bottom: 1.5rem; }
+    svg { width: 100%; min-width: 1072px; display: block; }
+    @media print {
+      .diagram-container { overflow-x: visible; }
+      svg { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">financial · domain</p>
+    <h1>Financial domain</h1>
+    <div class="diagram-container">
+      <svg viewBox="0 0 1072 472" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="financial-domain-title financial-domain-desc">
+        <title id="financial-domain-title">Financial domain</title>
+        <desc id="financial-domain-desc">The financial domain and its accounting subdomain, split in the bookkeeping and account bounded contexts, each with its aggregate, and the TransactionRegistered event that bookkeeping publishes and account consumes.</desc>
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="userSpaceOnUse"><path d="M1,1 L7,4 L1,7" fill="none" stroke="#2e58d6" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></marker>
+          <marker id="arrow-sync" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="userSpaceOnUse"><path d="M1,1 L7,4 L1,7" fill="none" stroke="#2e58d6" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></marker>
+          <marker id="arrow-async" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="userSpaceOnUse"><path d="M1,1 L7,4 L1,7" fill="none" stroke="#0b5573" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></marker>
+        </defs>
+
+        <rect width="100%" height="100%" rx="12" fill="#ffffff"/>
+
+        <!-- Domain and subdomain -->
+        <rect x="40" y="40" width="992" height="352" rx="12" fill="#e7ebf3"/>
+        <text x="64" y="72" fill="#011f51" font-size="16" font-family="'Nunito', 'Nunito Variable', system-ui, sans-serif" font-weight="700">Financial</text>
+        <text x="152" y="72" fill="#3f4a66" font-size="11" font-family="'Nunito', 'Nunito Variable', system-ui, sans-serif">Domain</text>
+        <rect x="64" y="96" width="944" height="272" rx="12" fill="#ffffff" stroke="#c4cbdc" stroke-width="1"/>
+        <text x="88" y="128" fill="#011f51" font-size="14" font-family="'Nunito', 'Nunito Variable', system-ui, sans-serif" font-weight="700">Accounting</text>
+        <text x="176" y="128" fill="#3f4a66" font-size="11" font-family="'Nunito', 'Nunito Variable', system-ui, sans-serif">Subdomain: recording and summarizing financial transactions</text>
+
+        <!-- Relationship: bookkeeping publishes, account consumes -->
+        <line x1="456" y1="252" x2="616" y2="252" stroke="#0b5573" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#arrow-async)"/>
+        <rect x="464.0" y="264" width="144" height="24" rx="12" fill="#ffffff"/>
+        <rect x="464.0" y="264" width="144" height="24" rx="12" fill="#e7f6fe" stroke="#0b5573" stroke-width="1"/>
+        <text x="536" y="279.5" fill="#0b5573" font-size="9.5" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-weight="500" text-anchor="middle">TransactionRegistered</text>
+        <rect x="468.5" y="227" width="135" height="14" rx="3" fill="#ffffff"/>
+        <text x="536" y="238" fill="#3f4a66" font-size="10" font-family="'Nunito', 'Nunito Variable', system-ui, sans-serif" font-weight="600" text-anchor="middle">Publishes, at least once</text>
+
+        <!-- Bounded contexts -->
+        <rect x="88" y="152" width="368" height="192" rx="12" fill="#e4ecff" stroke="#2e58d6" stroke-width="1.2" stroke-dasharray="1.5,3.5"/>
+        <text x="112" y="184" fill="#011f51" font-size="14" font-family="'Nunito', 'Nunito Variable', system-ui, sans-serif" font-weight="700">Bookkeeping</text>
+        <text x="112" y="204" fill="#3f4a66" font-size="11" font-family="'Nunito', 'Nunito Variable', system-ui, sans-serif">Records each financial transaction</text>
+        <rect x="112" y="228" width="320" height="88" rx="10" fill="#ffffff"/>
+        <text x="272" y="266" fill="#011f51" font-size="13" font-family="'Nunito', 'Nunito Variable', system-ui, sans-serif" font-weight="700" text-anchor="middle">Transaction</text>
+        <text x="272" y="284" fill="#3f4a66" font-size="11" font-family="'Nunito', 'Nunito Variable', system-ui, sans-serif" text-anchor="middle">Aggregate, event sourced</text>
+        <rect x="616" y="152" width="368" height="192" rx="12" fill="#e4ecff" stroke="#2e58d6" stroke-width="1.2" stroke-dasharray="1.5,3.5"/>
+        <text x="640" y="184" fill="#011f51" font-size="14" font-family="'Nunito', 'Nunito Variable', system-ui, sans-serif" font-weight="700">Account</text>
+        <text x="640" y="204" fill="#3f4a66" font-size="11" font-family="'Nunito', 'Nunito Variable', system-ui, sans-serif">Keeps the balance of each account</text>
+        <rect x="640" y="228" width="320" height="88" rx="10" fill="#ffffff"/>
+        <text x="800" y="266" fill="#011f51" font-size="13" font-family="'Nunito', 'Nunito Variable', system-ui, sans-serif" font-weight="700" text-anchor="middle">AccountBalance</text>
+        <text x="800" y="284" fill="#3f4a66" font-size="11" font-family="'Nunito', 'Nunito Variable', system-ui, sans-serif" text-anchor="middle">Aggregate, debit and credit</text>
+
+        <!-- Legend -->
+        <line x1="40" y1="416" x2="1032" y2="416" stroke="#dbe0ec" stroke-width="1"/>
+        <rect x="40" y="435" width="18" height="12" rx="4" fill="#e7ebf3"/>
+        <text x="66" y="444" fill="#3f4a66" font-size="10.5" font-family="'Nunito', 'Nunito Variable', system-ui, sans-serif">Domain</text>
+        <rect x="126" y="435" width="18" height="12" rx="4" fill="#ffffff" stroke="#c4cbdc" stroke-width="1"/>
+        <text x="152" y="444" fill="#3f4a66" font-size="10.5" font-family="'Nunito', 'Nunito Variable', system-ui, sans-serif">Subdomain, aggregate</text>
+        <rect x="288" y="435" width="18" height="12" rx="4" fill="#e4ecff" stroke="#2e58d6" stroke-width="1" stroke-dasharray="1.5,2.5"/>
+        <text x="314" y="444" fill="#3f4a66" font-size="10.5" font-family="'Nunito', 'Nunito Variable', system-ui, sans-serif">Bounded context</text>
+        <rect x="423" y="435" width="24" height="12" rx="6" fill="#e7f6fe" stroke="#0b5573" stroke-width="1"/>
+        <text x="455" y="444" fill="#3f4a66" font-size="10.5" font-family="'Nunito', 'Nunito Variable', system-ui, sans-serif">Event</text>
+        <line x1="510" y1="441" x2="534" y2="441" stroke="#0b5573" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#arrow-async)"/>
+        <text x="542" y="444" fill="#3f4a66" font-size="10.5" font-family="'Nunito', 'Nunito Variable', system-ui, sans-serif">Asynchronous delivery</text>
+      </svg>
+    </div>
+  </div>
+</body>
+</html>

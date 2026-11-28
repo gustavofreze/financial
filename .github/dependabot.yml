@@ -1,0 +1,31 @@
+version: 2
+
+multi-ecosystem-groups:
+  container-images:
+    schedule:
+      interval: daily
+
+updates:
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: daily
+
+  - package-ecosystem: docker
+    directories:
+      - /
+      - /docker/kafka-connect
+    patterns:
+      - "*"
+    multi-ecosystem-group: container-images
+
+  - package-ecosystem: docker-compose
+    directory: /
+    patterns:
+      - "*"
+    multi-ecosystem-group: container-images
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: daily

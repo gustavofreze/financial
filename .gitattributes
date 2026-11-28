@@ -1,0 +1,34 @@
+# Auto detect text files and perform LF normalization
+* text=auto eol=lf
+
+# Diff drivers
+*.kt            diff=kotlin
+*.kts           diff=kotlin
+*.md            diff=markdown
+
+# Force LF (breaks inside Docker/Linux if CRLF)
+*.sh            text eol=lf
+gradlew         text eol=lf
+Makefile        text eol=lf
+Dockerfile      text eol=lf
+docker-compose* text eol=lf
+
+# Force CRLF (the Windows wrapper script)
+*.bat           text eol=crlf
+
+# Binary (never merge or diff)
+*.jar           binary
+*.pem           binary
+*.key           binary
+*.crt           binary
+
+# Generated (skip diff and GitHub stats)
+gradlew         linguist-generated
+gradlew.bat     linguist-generated
+*.sql           linguist-detectable=false
+docs/**         linguist-documentation
+
+# Tooling around the service (skip GitHub stats, so they count only Kotlin)
+Makefile        linguist-detectable=false
+Dockerfile      linguist-detectable=false
+*.sh            linguist-detectable=false

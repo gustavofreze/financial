@@ -16,18 +16,20 @@ consumes the event, after the command returns.
 
 The command takes no input. Its values are fixed, except for the amount, drawn at random on each run.
 
-| Field           |  Type  | Description                   | Value                                   |
-|:----------------|:------:|:------------------------------|:----------------------------------------|
-| `amount`        | Amount | Amount of the transaction.    | Random whole value from 10 to 10000 BRL. |
-| `debitAccount`  | String | Account the amount leaves.    | `2.1.1.001`                             |
-| `creditAccount` | String | Account the amount goes into. | `2.2.1.001`                             |
+| Field           |    Type    | Description                   | Value                                 |
+|:----------------|:----------:|:------------------------------|:--------------------------------------|
+| `amount`        | BigDecimal | Amount of the transaction.    | Random whole value from 10 to 10000.  |
+| `currency`      |   String   | Currency of the amount.       | `BRL`                                 |
+| `debitAccount`  |   String   | Account the amount leaves.    | `2.1.1.001`                           |
+| `creditAccount` |   String   | Account the amount goes into. | `2.2.1.001`                           |
 
 ### Result
 
 - **Log**: `Transaction with value <amount> has been registered`.
 
-- **Event**: `TransactionRegistered`, revision 1, appended to `bookkeeping.transactions` and published by change data
-  capture on the topic `financial.accounting.bookkeeping.transaction-registered`.
+- **Event**: `TransactionRegistered`, revision 1, sequence 1, appended to `bookkeeping.transactions` with its
+  `occurred_on` in UTC, and published by change data capture on the topic
+  `financial.accounting.bookkeeping.transaction-registered`.
 
   **Payload**:
   ```json
@@ -49,24 +51,34 @@ The command takes no input. Its values are fixed, except for the amount, drawn a
 
 The `AdjustBalancePolicy` of the account context reacts to each `TransactionRegistered` consumed from Kafka with the
 command `AdjustBalance`. The amount is subtracted from the debit account and added to the credit account, even when
-that leaves the debit account at zero or negative. The command is not exposed to the console.
+that leaves the debit account at zero or negative. Both balances change in one database transaction, so a transfer is
+never half applied, and the transaction id is recorded in `account.adjustments`, so an event delivered twice adjusts the
+balances only once. The command is not exposed to the console.
 
 **Trigger** `TransactionRegistered` on `financial.accounting.bookkeeping.transaction-registered`
 
 ### Command
 
-| Field           |  Type  | Description                          | Constraints                                   |
-|:----------------|:------:|:-------------------------------------|:----------------------------------------------|
-| `id`            | String | Identifier of the transaction.       | UUID of the `TransactionRegistered` event.    |
-| `balance`       | Amount | Amount to move.                      | Same currency as both accounts.               |
-| `debitAccount`  | String | Number of the account to debit.      | Must exist in `account.balances`.             |
-| `creditAccount` | String | Number of the account to credit.     | Must exist in `account.balances`.             |
+| Field           |    Type    | Description                      | Constraints                                    |
+|:----------------|:----------:|:---------------------------------|:-----------------------------------------------|
+| `amount`        | BigDecimal | Amount to move.                  | Taken from the event.                          |
+| `currency`      |   String   | Currency of the amount.          | Same currency as both accounts.                |
+| `debitAccount`  |   String   | Number of the account to debit.  | Must exist in `account.balances`.              |
+| `creditAccount` |   String   | Number of the account to credit. | Must exist in `account.balances`.              |
+| `transactionId` |   String   | Identifier of the transaction.   | The `id` of the `TransactionRegistered` event. |
 
 ### Result
 
-- **Success**: both rows of `account.balances` are updated with the new balance and `updated_at`.
+- **Success**: both rows of `account.balances` are updated with the new balance and `updated_at`, and the transaction
+  id is inserted in `account.adjustments`, in one database transaction.
 
-- **Failure**: the policy does not stop the stream. The event, the policy and the stack trace are stored in
+- **Redelivery**: when the transaction id is already in `account.adjustments`, nothing changes.
+
+- **Concurrent change**: when either balance changed after it was read (its `version` no longer matches), neither
+  balance changes and the transaction id is not stored. The failure is stored like any other below, and a replay
+  adjusts from the current balances.
+
+- **Failure**: the policy does not stop the stream. The event, the policy and the error are stored in
   `account.troubleshoot`, from which [Failures solving](#failures-solving) runs the policy again.
 
   Typical errors:
@@ -79,14 +91,19 @@ that leaves the debit account at zero or negative. The command is not exposed to
   Currencies cannot be different
   ```
 
+  ```
+  Balance of account <number> changed during the adjustment
+  ```
+
 ## Failures solving
 
 #### Runs again the policies whose events failed, from the troubleshooting queue.
 
-The command reads up to 100 entries of `account.troubleshoot` not yet resent, runs each event through the policy that
-failed on it, and marks the entry as resent. A policy that fails again stores a new entry. The initial data seeds one
-failed `TransactionRegistered` of BRL 100.00 from `2.1.1.001` to `2.2.1.001`, so the command has something to solve on
-a fresh environment.
+The command reads up to 100 entries of `account.troubleshoot` not yet resent, oldest first, and runs each event again
+through the policy that failed on it. An entry is marked as resent only when the policy succeeds. When it fails again,
+the entry stays pending with the new error, so the next run retries it. The initial data seeds one failed
+`TransactionRegistered` of BRL 100.00 from `2.1.1.001` to `2.2.1.001`, so the command has something to solve on a fresh
+environment.
 
 **Console** `make solve-failures`
 
@@ -100,5 +117,6 @@ a fresh environment.
 
 - **Log**: `Number of processed failures: <count>`.
 
-- **Effect**: each processed entry gets `resent = 1` and `updated_at` set, and its policy runs as in
-  [Balance adjusting](#balance-adjusting).
+- **Effect**: each entry whose policy succeeds gets `resent = 1` and `updated_at` set, and its policy runs as in
+  [Balance adjusting](#balance-adjusting). Each entry whose policy fails again keeps `resent = 0` and gets the new
+  `error` and `updated_at`.

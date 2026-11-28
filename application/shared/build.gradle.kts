@@ -1,18 +1,24 @@
+plugins {
+    `java-test-fixtures`
+}
+
 dependencies {
-    implementation("io.insert-koin:koin-core:${property("koinVersion")}")
+    implementation(libs.slf4j.api)
+    implementation(libs.jdbi.core)
+    implementation(libs.hikari)
+    implementation(libs.avro)
+    implementation(libs.kafka.clients)
+    implementation(libs.kafka.streams)
+    implementation(libs.kafka.streams.avro.serde)
+    implementation(libs.jackson.module.kotlin)
 
-    implementation("com.github.kittinunf.fuel:fuel:${property("fuelVersion")}")
-    implementation("com.github.kittinunf.fuel:fuel-jackson:${property("fuelVersion")}")
+    constraints {
+        implementation(libs.guava)
+    }
 
-    implementation("com.fasterxml.jackson.core:jackson-core:${property("jacksonVersion")}")
-    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:${property("jacksonVersion")}")
-    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:${property("jacksonVersion")}")
+    testImplementation(libs.kafka.streams.test.utils)
+    testRuntimeOnly(libs.slf4j.simple)
 
-    implementation("org.apache.kafka:kafka-streams:${property("kafkaStreamsVersion")}")
-    implementation("org.apache.kafka:kafka-clients:${property("kafkaClientVersion")}")
-    implementation("io.confluent:kafka-avro-serializer:${property("kafkaVersion")}")
-    implementation("io.confluent:kafka-streams-avro-serde:${property("kafkaVersion")}")
-
-    implementation("org.slf4j:slf4j-simple:${property("slf4jVersion")}")
-    implementation("io.github.microutils:kotlin-logging:${property("loggingVersion")}")
+    testFixturesImplementation(libs.h2)
+    testFixturesImplementation(libs.jdbi.core)
 }

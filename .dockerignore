@@ -1,0 +1,7 @@
+*
+!settings.gradle.kts
+!build.gradle.kts
+!gradle.properties
+!gradle/libs.versions.toml
+!application/*/build.gradle.kts
+!application/*/src/main

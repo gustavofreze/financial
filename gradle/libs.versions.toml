@@ -1,0 +1,41 @@
+[versions]
+h2 = "2.5.252"
+avro = "1.12.2"
+jdbi = "3.55.0"
+guava = "33.8.0-jre"
+junit = "6.1.3"
+kafka = "8.4.1-ccs"
+slf4j = "2.0.20"
+hikari = "7.1.0"
+jacoco = "0.8.16"
+kotlin = "2.4.21"
+ktlint = "1.8.0"
+pitest = "1.30.2"
+shadow = "9.6.1"
+jackson = "3.3.0"
+confluent = "8.4.1"
+postgresql = "42.7.15"
+pitest-junit5 = "1.2.3"
+
+[libraries]
+h2 = { module = "com.h2database:h2", version.ref = "h2" }
+avro = { module = "org.apache.avro:avro", version.ref = "avro" }
+guava = { module = "com.google.guava:guava", version.ref = "guava" }
+hikari = { module = "com.zaxxer:HikariCP", version.ref = "hikari" }
+jdbi-core = { module = "org.jdbi:jdbi3-core", version.ref = "jdbi" }
+junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
+slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
+ktlint-cli = { module = "com.pinterest.ktlint:ktlint-cli", version.ref = "ktlint" }
+postgresql = { module = "org.postgresql:postgresql", version.ref = "postgresql" }
+slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4j" }
+kafka-clients = { module = "org.apache.kafka:kafka-clients", version.ref = "kafka" }
+kafka-streams = { module = "org.apache.kafka:kafka-streams", version.ref = "kafka" }
+pitest-command-line = { module = "org.pitest:pitest-command-line", version.ref = "pitest" }
+pitest-junit5-plugin = { module = "org.pitest:pitest-junit5-plugin", version.ref = "pitest-junit5" }
+jackson-module-kotlin = { module = "tools.jackson.module:jackson-module-kotlin", version.ref = "jackson" }
+kafka-streams-avro-serde = { module = "io.confluent:kafka-streams-avro-serde", version.ref = "confluent" }
+kafka-streams-test-utils = { module = "org.apache.kafka:kafka-streams-test-utils", version.ref = "kafka" }
+
+[plugins]
+shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }

@@ -1,123 +1,147 @@
 services:
   app:
     build:
-      context: ../financial
-      dockerfile: ./Dockerfile
+      context: .
+    restart: unless-stopped
     hostname: app
     container_name: app
     env_file:
       - ./config/configs.env
-    ports:
-      - "8080:8080"
-    volumes:
-      - ./gradle:/opt/data/gradle
-      - ./gradlew:/opt/data/gradlew
-      - ./application:/opt/data/application
-      - ./entrypoint.sh:/opt/data/entrypoint.sh
-      - ./build.gradle.kts:/opt/data/build.gradle.kts
-      - ./gradle.properties:/opt/data/gradle.properties
-      - ./settings.gradle.kts:/opt/data/settings.gradle.kts
-      - ./application/starter/build/libs/starter-all.jar:/opt/data/starter-all.jar
-      - ./application/starter/src/main/resources/kafka/connectors:/opt/data/kafka/connectors
-      - ./application/account/src/main/resources/command/show-balance.sh:/opt/data/show-balance.sh
-      - ./application/account/src/main/resources/command/solve-failures.sh:/opt/data/solve-failures.sh
-      - ./application/bookkeeping/src/main/resources/command/register-financial-transaction.sh:/opt/data/register-financial-transaction.sh
+    cpus: 2
+    mem_limit: 2g
     depends_on:
-      - broker
-      - postgresql
-      - schema-registry
+      broker:
+        condition: service_healthy
+      kafka-connect:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy
+      financial-migrate:
+        condition: service_completed_successfully
+
+  financial-migrate:
+    image: flyway/flyway:13.13.0-alpine
+    hostname: financial-migrate
+    container_name: financial-migrate
+    command: [ "-connectRetries=60", "migrate" ]
+    env_file:
+      - ./config/configs.env
+    cpus: 0.5
+    mem_limit: 256m
+    volumes:
+      - ./application/starter/src/main/resources/db/postgresql/migration:/flyway/sql:ro
+    depends_on:
+      postgresql:
+        condition: service_healthy
 
   postgresql:
-    image: debezium/postgres:15-alpine
+    image: postgres:18.7
     restart: unless-stopped
     hostname: postgresql
     container_name: postgresql
-    environment:
-      POSTGRES_DB: "financial_adm"
-      POSTGRES_USER: "postgres"
-      POSTGRES_PASSWORD: "postgres"
+    command: [ "postgres", "-c", "wal_level=logical" ]
+    env_file:
+      - ./config/configs.env
+    cpus: 1
+    mem_limit: 512m
     ports:
       - "5432:5432"
-    volumes:
-      - ./application/starter/src/main/resources/db/postgresql/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres -d financial_adm" ]
+      test: [ "CMD-SHELL", "pg_isready -h localhost -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\"" ]
       timeout: 5s
       retries: 5
       interval: 10s
 
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.9.5
-    restart: unless-stopped
-    hostname: zookeeper
-    container_name: zookeeper
-    environment:
-      ZOOKEEPER_SERVER_ID: "1"
-      ZOOKEEPER_TICK_TIME: "2000"
-      ZOOKEEPER_CLIENT_PORT: "2181"
-    ports:
-      - "2181:2181"
-
   broker:
-    image: confluentinc/cp-kafka:7.9.5
+    image: confluentinc/cp-kafka:8.4.1
     restart: unless-stopped
     hostname: broker
     container_name: broker
+    cpus: 2
+    mem_limit: 2g
     environment:
-      KAFKA_BROKER_ID: "1"
-      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9000,PLAINTEXT_HOST://0.0.0.0:9001"
-      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
+      CLUSTER_ID: "MnruGBkQRXKqtA8b03I0GA"
+      KAFKA_NODE_ID: "1"
+      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9000,PLAINTEXT_HOST://0.0.0.0:9001,CONTROLLER://0.0.0.0:9093"
+      KAFKA_PROCESS_ROLES: "broker,controller"
       KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://broker:9000,PLAINTEXT_HOST://localhost:9001"
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@broker:9093"
       KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
-      KAFKA_CONFLUENT_SCHEMA_REGISTRY_URL: "http://schema-registry:8081"
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT"
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
     ports:
       - "9000:9000"
       - "9001:9001"
-    depends_on:
-      - zookeeper
+    healthcheck:
+      test: [ "CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/9000" ]
+      timeout: 10s
+      retries: 3
+      interval: 30s
+      start_period: 60s
+      start_interval: 5s
 
   schema-registry:
-    image: confluentinc/cp-schema-registry:7.9.5
+    image: confluentinc/cp-schema-registry:8.4.1
     restart: unless-stopped
     hostname: schema-registry
     container_name: schema-registry
+    cpus: 1
+    mem_limit: 1g
     environment:
       SCHEMA_REGISTRY_HOST_NAME: "schema-registry"
       SCHEMA_REGISTRY_LISTENERS: "http://0.0.0.0:8081"
-      SCHEMA_REGISTRY_AVRO_COMPATIBILITY_LEVEL: "forward_transitive"
+      SCHEMA_REGISTRY_SCHEMA_COMPATIBILITY_LEVEL: "forward_transitive"
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: "PLAINTEXT://broker:9000"
     ports:
       - "8081:8081"
+    healthcheck:
+      test: [ "CMD", "ub", "sr-ready", "localhost", "8081", "5" ]
+      timeout: 10s
+      retries: 20
+      interval: 5s
     depends_on:
-      - broker
-      - zookeeper
+      broker:
+        condition: service_healthy
 
   kafka-connect:
-    image: debezium/connect:1.9.7.Final
+    build:
+      context: ./docker/kafka-connect
     restart: unless-stopped
     hostname: kafka-connect
     container_name: kafka-connect
+    cpus: 2
+    mem_limit: 1536m
     environment:
-      GROUP_ID: "1"
-      HEAP_OPTS: "-Xmx256m"
-      KEY_CONVERTER: "io.confluent.connect.avro.AvroConverter"
-      VALUE_CONVERTER: "io.confluent.connect.avro.AvroConverter"
-      BOOTSTRAP_SERVERS: "broker:9000"
-      CONFIG_STORAGE_TOPIC: "kafka.connect.config"
-      OFFSET_STORAGE_TOPIC: "kafka.connect.offsets"
-      STATUS_STORAGE_TOPIC: "kafka.connect.status"
-      INTERNAL_KEY_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
-      INTERNAL_VALUE_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
-      KEY_CONVERTER_SCHEMA_REGISTRY_URL: "http://schema-registry:8081"
-      VALUE_CONVERTER_SCHEMA_REGISTRY_URL: "http://schema-registry:8081"
+      KAFKA_HEAP_OPTS: "-Xmx512m"
+      CONNECT_GROUP_ID: "financial-connect"
+      CONNECT_PLUGIN_PATH: "/usr/share/java"
+      CONNECT_PLUGIN_DISCOVERY: "only_scan"
+      CONNECT_KEY_CONVERTER: "io.confluent.connect.avro.AvroConverter"
+      CONNECT_VALUE_CONVERTER: "io.confluent.connect.avro.AvroConverter"
+      CONNECT_BOOTSTRAP_SERVERS: "broker:9000"
+      CONNECT_CONFIG_STORAGE_TOPIC: "kafka.connect.config"
+      CONNECT_OFFSET_STORAGE_TOPIC: "kafka.connect.offsets"
+      CONNECT_STATUS_STORAGE_TOPIC: "kafka.connect.status"
+      CONNECT_REST_ADVERTISED_HOST_NAME: "kafka-connect"
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: "1"
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: "1"
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: "1"
+      CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL: "http://schema-registry:8081"
+      CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: "http://schema-registry:8081"
     ports:
       - "8083:8083"
+    healthcheck:
+      test: [ "CMD", "ub", "connect-ready", "localhost", "8083", "5" ]
+      timeout: 10s
+      retries: 30
+      interval: 5s
     depends_on:
-      - broker
-      - schema-registry
+      broker:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy

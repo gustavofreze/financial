@@ -1,3 +1,13 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-java -jar starter-all.jar "useCase" "SolveFailures"
+# solve-failures.sh
+# Runs again the policies that failed.
+# Usage: ./solve-failures.sh
+# Arguments: none.
+
+main() {
+  java -jar starter-all.jar "useCase" "SolveFailures"
+}
+
+main "$@"

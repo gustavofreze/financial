@@ -1,5 +1,10 @@
 .idea
 .gradle
-build
-!application/starter/build/libs/starter-all.jar
 .gradle-home
+.kotlin
+build
+
+# Local agent instructions, kept out of the repository.
+.claude/
+AGENTS.md
+CLAUDE.md

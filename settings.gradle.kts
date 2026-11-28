@@ -10,17 +10,17 @@ pluginManagement {
         mavenCentral()
         gradlePluginPortal()
     }
+}
 
-    resolutionStrategy {
-        eachPlugin {
-            val kotlinVersion: String by settings
-            val shadowVersion: String by settings
-            val testLoggerVersion: String by settings
-
-            when (requested.id.id) {
-                "com.adarshr.test-logger" -> useVersion(testLoggerVersion)
-                "org.jetbrains.kotlin.jvm" -> useVersion(kotlinVersion)
-                "com.github.johnrengelman.shadow" -> useVersion(shadowVersion)
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        mavenCentral()
+        exclusiveContent {
+            forRepository { maven(url = "https://packages.confluent.io/maven") }
+            filter {
+                includeModuleByRegex("io\\.confluent.*", "(?!logredactor).*")
+                includeVersionByRegex("org\\.apache\\.kafka", ".*", ".*-ccs")
             }
         }
     }

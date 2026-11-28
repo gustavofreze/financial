@@ -1,23 +1,24 @@
 package financial.accounting.account.driven.repository
 
-import financial.accounting.account.core.model.AccountBalance
-import financial.accounting.account.core.valueobject.AccountId
-import financial.shared.databases.DatabaseContext
-import financial.shared.databases.DatabaseMapper
-import financial.shared.valueobject.Amount
-import financial.shared.valueobject.Currency
-import java.sql.ResultSet
+import financial.accounting.account.application.domain.models.AccountBalance
+import financial.accounting.account.application.domain.models.AccountId
+import financial.accounting.account.application.domain.models.AccountNumber
+import financial.shared.adapters.database.Row
+import financial.shared.adapters.database.RowMapper
+import financial.shared.domain.models.Amount
+import financial.shared.domain.models.Currency
+import financial.shared.domain.models.Version
 
-class AccountBalanceMapper : DatabaseMapper<AccountBalance> {
+class AccountBalanceMapper : RowMapper<AccountBalance> {
 
-    override fun map(resultSet: ResultSet, context: DatabaseContext): AccountBalance {
-        val currency = Currency.valueOf(resultSet.getString("currency"))
-
-        return AccountBalance(
-            identity = AccountId(resultSet.getInt("id")),
-            number = resultSet.getString("number"),
-            balance = Amount(resultSet.getBigDecimal("balance"), currency),
-            updatedAt = resultSet.getTimestamp("updated_at").toLocalDateTime()
-        )
-    }
+    override fun map(row: Row) = AccountBalance(
+        id = AccountId(value = row.integer(column = "id")),
+        number = AccountNumber(value = row.text(column = "number")),
+        balance = Amount(
+            value = row.decimal(column = "balance"),
+            currency = Currency.from(code = row.text(column = "currency"))
+        ),
+        version = Version(value = row.long(column = "version")),
+        updatedAt = row.dateTime(column = "updated_at")
+    )
 }
